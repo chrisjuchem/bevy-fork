@@ -863,6 +863,16 @@ category = "ECS (Entity Component System)"
 wasm = true
 
 [[example]]
+name = "indicies"
+path = "examples/ecs/indicies.rs"
+
+[package.metadata.example.indicies]
+name = "Indices"
+description = "Shows how to use indicies to efficiently locate components with specifc values"
+category = "ECS (Entity Component System)"
+wasm = true
+
+[[example]]
 name = "parallel_query"
 path = "examples/ecs/parallel_query.rs"
 

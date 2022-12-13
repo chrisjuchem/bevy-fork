@@ -1176,4 +1176,43 @@ mod tests {
             );
         });
     }
+
+    use crate::system::{ComponentIndex, Index, IndexUpdateStrategy};
+    use bevy_utils::{HashMap, HashSet};
+    impl ComponentIndex for W<u32> {
+        type Component = W<u32>;
+        type Value = u32;
+        const UPDATE_STRATEGY: IndexUpdateStrategy = IndexUpdateStrategy::Lazy;
+
+        fn get_value(c: &Self::Component) -> Self::Value {
+            c.0
+        }
+    }
+
+    struct SqrIndex {}
+    impl ComponentIndex for SqrIndex {
+        type Component = W<u32>;
+        type Value = u64;
+        const UPDATE_STRATEGY: IndexUpdateStrategy = IndexUpdateStrategy::Lazy;
+
+        fn get_value(c: &Self::Component) -> Self::Value {
+            c.0 as u64 * c.0 as u64
+        }
+    }
+
+    #[test]
+    fn test_index() {
+        let mut world = World::new();
+        let entity3 = world.spawn(W(3u32)).id();
+        let entity4 = world.spawn(W(4u32)).id();
+
+        run_system(
+            &mut world,
+            move |idx: Index<W<u32>>, idx2: Index<SqrIndex>| {
+                assert_eq!(idx.get(&3), HashSet::from([entity3]))
+            },
+        );
+
+        // assert_is_system(my_system);
+    }
 }

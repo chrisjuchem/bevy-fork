@@ -16,6 +16,8 @@ pub use bevy_ecs_macros::SystemParam;
 use bevy_ecs_macros::{all_tuples, impl_param_set};
 use bevy_ptr::UnsafeCellDeref;
 use bevy_utils::synccell::SyncCell;
+use bevy_utils::{HashMap, HashSet};
+use std::hash::Hash;
 use std::{
     borrow::Cow,
     fmt::Debug,
@@ -888,6 +890,75 @@ impl<'w, 's, T: Component> SystemParamFetch<'w, 's> for RemovedComponentsState<T
             component_id: state.component_id,
             marker: PhantomData,
         }
+    }
+}
+
+pub enum IndexUpdateStrategy {
+    /// Don't store any data; iterate through all components when doing a lookup.
+    /// Computationally equivalent to not using an index, but allow you to use its interface
+    None,
+    /// Just before use, recalculate values for all components changed since the last use of this index
+    Lazy,
+    // /// Calculate values for components as soon as they change
+    // Eager,
+    /// Never update index values automatically.
+    /// This could allow for increased performance (for example, if you can know that
+    /// a change to a component did not change the index value), at the cost of
+    /// additional work for the programmer.
+    Manual,
+}
+
+pub trait ComponentIndex {
+    type Component: Component;
+    type Value: Eq + Hash;
+    const UPDATE_STRATEGY: IndexUpdateStrategy;
+
+    fn get_value(c: &Self::Component) -> Self::Value;
+}
+
+pub type IndexStore<'w, I: ComponentIndex> = HashMap<I::Value, HashSet<Entity>>;
+
+/// Access to a ComponentIndex
+pub struct Index<'w, I: ComponentIndex> {
+    marker: PhantomData<I>,
+}
+
+impl<'w, I: 'static + ComponentIndex> Index<'w, I> {
+    pub(crate) fn get(&self, val: &I::Value) -> HashSet<Entity> {
+        self.store
+            .get(val)
+            .map(|set_ref| set_ref.clone())
+            .unwrap_or_else(|| HashSet::new())
+    }
+}
+
+impl<'w, I: 'static + ComponentIndex + Send + Sync> SystemParam for Index<'w, I> {
+    type Fetch = IndexState<I>;
+}
+
+pub struct IndexState<I: ComponentIndex> {
+    marker: PhantomData<I>,
+}
+//TODO safety
+unsafe impl<I: 'static + Send + Sync + ComponentIndex> SystemParamState for IndexState<I> {
+    fn init(world: &mut World, system_meta: &mut SystemMeta) -> Self {
+        Self {
+            store: world.resource::<&IndexStore<I>>(),
+        }
+    }
+}
+
+impl<'w, 's, I: 'static + Send + Sync + ComponentIndex> SystemParamFetch<'w, 's> for IndexState<I> {
+    type Item = Index<'w, I>;
+
+    unsafe fn get_param(
+        state: &'s mut Self,
+        system_meta: &SystemMeta,
+        world: &'w World,
+        change_tick: u32,
+    ) -> Self::Item {
+        //todo
+        todo!()
     }
 }
 
